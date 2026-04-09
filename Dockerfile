@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -7,12 +7,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Build s2.cpp with CUDA support
+# We need to link against the CUDA driver stub at build time
 RUN git clone --recurse-submodules https://github.com/rodrigomatta/s2.cpp.git /opt/s2.cpp && \
     cd /opt/s2.cpp && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON \
+        -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" && \
     cmake --build build --parallel $(nproc) && \
-    cp build/s2 /usr/local/bin/s2 && \
-    rm -rf /opt/s2.cpp/build
+    cp build/s2 /usr/local/bin/s2
+
+# Runtime image
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the built binary
+COPY --from=builder /usr/local/bin/s2 /usr/local/bin/s2
 
 # Download Q8_0 model and tokenizer
 RUN mkdir -p /models && \
