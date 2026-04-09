@@ -34,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/s2 /usr/local/bin/s2
+COPY --from=builder /opt/s2.cpp/build/ggml/src/ggml-cpu/libggml-cpu.so.0.9.8 /usr/local/lib/
+COPY --from=builder /opt/s2.cpp/build/ggml/src/ggml-cuda/libggml-cuda.so.0.9.8 /usr/local/lib/
+RUN ldconfig
 
 # Download Q8_0 model and tokenizer
 RUN mkdir -p /models && \
