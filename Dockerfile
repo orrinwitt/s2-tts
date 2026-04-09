@@ -6,16 +6,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake build-essential git \
     && rm -rf /var/lib/apt/lists/*
 
-# Build s2.cpp with CUDA support
-# Create a symlink so the CUDA driver stub is found at link time
-RUN git clone --recurse-submodules https://github.com/rodrigomatta/s2.cpp.git /opt/s2.cpp && \
-    cd /opt/s2.cpp && \
-    ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
+# Step 1: Clone repo (cached if unchanged)
+RUN git clone --recurse-submodules https://github.com/rodrigomatta/s2.cpp.git /opt/s2.cpp
+
+# Step 2: Symlink CUDA stub so linker finds libcuda.so.1
+RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
     echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/cuda-stubs.conf && \
-    ldconfig && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON && \
-    cmake --build build --parallel $(nproc) && \
-    cp build/s2 /usr/local/bin/s2
+    ldconfig
+
+# Step 3: CMake configure (cached if cmake flags unchanged)
+WORKDIR /opt/s2.cpp
+RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON
+
+# Step 4: Build (only this layer re-runs if compilation fails)
+RUN cmake --build build --parallel $(nproc)
+
+# Step 5: Copy binary out
+RUN cp build/s2 /usr/local/bin/s2
 
 # Runtime image — smaller footprint
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
