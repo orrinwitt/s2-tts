@@ -21,8 +21,10 @@ RUN cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON
 # Step 4: Build (only this layer re-runs if compilation fails)
 RUN cmake --build build --parallel $(nproc)
 
-# Step 5: Copy binary out
-RUN cp build/s2 /usr/local/bin/s2
+# Step 5: Copy binary and shared libs out before cleanup
+RUN cp build/s2 /usr/local/bin/s2 && \
+    mkdir -p /usr/local/lib/s2 && \
+    find build -name "libggml*.so*" -exec cp {} /usr/local/lib/s2/ \;
 
 # Runtime image — smaller footprint
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
@@ -34,8 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/s2 /usr/local/bin/s2
-COPY --from=builder /opt/s2.cpp/build/ggml/src/ggml-cpu/libggml-cpu.so.0.9.8 /usr/local/lib/
-COPY --from=builder /opt/s2.cpp/build/ggml/src/ggml-cuda/libggml-cuda.so.0.9.8 /usr/local/lib/
+COPY --from=builder /usr/local/lib/s2/ /usr/local/lib/
 RUN ldconfig
 
 # Download Q8_0 model and tokenizer
