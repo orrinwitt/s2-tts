@@ -3,19 +3,21 @@ FROM nvidia/cuda:12.4.1-devel-ubuntu22.04 AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake build-essential git curl \
+    cmake build-essential git \
     && rm -rf /var/lib/apt/lists/*
 
 # Build s2.cpp with CUDA support
-# We need to link against the CUDA driver stub at build time
+# Create a symlink so the CUDA driver stub is found at link time
 RUN git clone --recurse-submodules https://github.com/rodrigomatta/s2.cpp.git /opt/s2.cpp && \
     cd /opt/s2.cpp && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON \
-        -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/cuda/lib64/stubs" && \
+    ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
+    echo "/usr/local/cuda/lib64/stubs" > /etc/ld.so.conf.d/cuda-stubs.conf && \
+    ldconfig && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DS2_CUDA=ON && \
     cmake --build build --parallel $(nproc) && \
     cp build/s2 /usr/local/bin/s2
 
-# Runtime image
+# Runtime image — smaller footprint
 FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -24,7 +26,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the built binary
 COPY --from=builder /usr/local/bin/s2 /usr/local/bin/s2
 
 # Download Q8_0 model and tokenizer
