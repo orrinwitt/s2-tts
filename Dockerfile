@@ -21,7 +21,6 @@ RUN mkdir -p /models && \
     curl -L -o /models/tokenizer.json \
     "https://huggingface.co/rodrigomt/s2-pro-gguf/resolve/main/tokenizer.json"
 
-# Create references directory
 RUN mkdir -p /references
 
 ENV MODEL_PATH=/models/s2-pro-q8_0.gguf
@@ -32,4 +31,4 @@ ENV CUDA_DEVICE=0
 
 EXPOSE ${PORT}
 
-CMD s2 -m ${MODEL_PATH} -t ${TOKENIZER_PATH} --server -H ${HOST} -P ${PORT} -c ${CUDA_DEVICE}
+CMD ["sh", "-c", "s2 -m ${MODEL_PATH} -t ${TOKENIZER_PATH} --server -H ${HOST} -P ${PORT} -c ${CUDA_DEVICE}"]
